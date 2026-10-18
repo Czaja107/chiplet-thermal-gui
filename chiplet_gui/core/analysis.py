@@ -449,12 +449,24 @@ def power_preview(
 
 
 # ------------------------------------------------------------- layout helpers
+#: Die origins are kept to this many decimals everywhere: in memory, in saved
+#: designs and in the layout handed to the judge, so what is simulated is
+#: exactly what is submitted.
+PLACEMENT_DECIMALS = 3
+
+
 def snap(value: float, step: float) -> float:
     """Round *value* to the nearest multiple of *step*; ``step <= 0`` disables."""
 
     if step <= 0:
-        return round(float(value), 4)
-    return round(round(float(value) / step) * step, 4)
+        return round(float(value), PLACEMENT_DECIMALS)
+    return round(round(float(value) / step) * step, PLACEMENT_DECIMALS)
+
+
+def round_origin(x: float, y: float) -> list[float]:
+    """A die origin at the precision used for saving and judging."""
+
+    return [round(float(x), PLACEMENT_DECIMALS), round(float(y), PLACEMENT_DECIMALS)]
 
 
 def clamp_into_interposer(project: Project, name: str, x: float, y: float) -> tuple[float, float]:

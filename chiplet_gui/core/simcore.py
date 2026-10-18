@@ -78,11 +78,27 @@ def find_challenge_dir(explicit: str | os.PathLike[str] | None = None) -> Path:
     )
 
 
-@lru_cache(maxsize=4)
-def load_modules(challenge_dir: str | None = None) -> SimModules:
+#: The challenge directory the judge modules were first imported from. Later
+#: calls without an explicit directory reuse it, so ``--challenge-dir`` given at
+#: start-up governs every spec read, not only the first.
+_active_dir: Path | None = None
+
+
+def load_modules(challenge_dir: str | os.PathLike[str] | None = None) -> SimModules:
     """Import the judge modules once and return them as a bundle."""
 
-    directory = find_challenge_dir(challenge_dir)
+    global _active_dir
+    if challenge_dir is None and _active_dir is not None:
+        directory = _active_dir
+    else:
+        directory = find_challenge_dir(challenge_dir)
+        if _active_dir is None:
+            _active_dir = directory
+    return _load_from(directory)
+
+
+@lru_cache(maxsize=4)
+def _load_from(directory: Path) -> SimModules:
     text = str(directory)
     if text not in sys.path:
         # Prepend: the judge modules import each other by bare name.

@@ -127,9 +127,11 @@ class DieItem(QGraphicsRectItem):
     def itemChange(self, change, value):  # noqa: N802 - Qt naming
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and not self.canvas.loading:
             return self.canvas.constrain_position(self.die_name, value)
-        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
+        result = super().itemChange(change, value)
+        # ItemSelectedChange fires before isSelected() flips; recolour after it.
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
             self._apply_colors()
-        return super().itemChange(change, value)
+        return result
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
         self.setCursor(Qt.CursorShape.ClosedHandCursor)
@@ -303,10 +305,9 @@ class LayoutCanvas(QGraphicsView):
 
         moved = False
         for name, die_item in self._dies.items():
-            x_mm, y_mm = self.die_origin_from_pos(name, die_item.pos())
-            current = self._project.placements_mm[name]
-            if abs(current[0] - x_mm) > 1e-9 or abs(current[1] - y_mm) > 1e-9:
-                self._project.placements_mm[name] = [round(x_mm, 4), round(y_mm, 4)]
+            origin = analysis.round_origin(*self.die_origin_from_pos(name, die_item.pos()))
+            if origin != list(self._project.placements_mm[name]):
+                self._project.placements_mm[name] = origin
                 die_item.setToolTip(self._die_tooltip(name))
                 moved = True
         if moved:
@@ -331,7 +332,7 @@ class LayoutCanvas(QGraphicsView):
                     analysis.snap(x0 + dx_mm, self.snap_mm),
                     analysis.snap(y0 + dy_mm, self.snap_mm),
                 )
-                self._project.placements_mm[name] = [round(x_mm, 4), round(y_mm, 4)]
+                self._project.placements_mm[name] = analysis.round_origin(x_mm, y_mm)
                 self._dies[name].setPos(self.pos_from_die_origin(name, x_mm, y_mm))
                 self._dies[name].setToolTip(self._die_tooltip(name))
         finally:
@@ -859,19 +860,26 @@ class LayoutCanvas(QGraphicsView):
         if self.transform().m11() < 2.0:
             self.fit()
 
-    def grab_png(self, path: str, scale: int = 3) -> None:
-        """Save the current view as a PNG, for slides and reports."""
+    def grab_png(self, path: str, scale: int = 3) -> bool:
+        """Save the current view as a PNG, for slides and reports.
 
-        rect = self._scene.sceneRect()
+        Rendered through the view rather than the scene, so the interposer,
+        overlay field, outlines and track grid drawn in ``drawBackground`` are
+        included. *scale* supersamples the on-screen size for a sharp image.
+        """
+
+        source = QRectF(self.viewport().rect())
         image = QImage(
-            int(rect.width() * scale), int(rect.height() * scale), QImage.Format.Format_ARGB32
+            int(source.width() * scale), int(source.height() * scale), QImage.Format.Format_ARGB32
         )
+        image.setDevicePixelRatio(scale)
         image.fill(QColor(18, 18, 20))
         painter = QPainter(image)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self._scene.render(painter, QRectF(image.rect()), rect)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+        self.render(painter, source, source.toRect())
         painter.end()
-        image.save(path)
+        return image.save(path)
 
 
 __all__ = ["MODE_ROUTE", "MODE_SELECT", "DieItem", "LayoutCanvas"]

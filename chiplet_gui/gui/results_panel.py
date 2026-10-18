@@ -319,6 +319,12 @@ class ResultsPanel(QWidget):
                 reasons.append(f"{len(result.deviations)} setup value(s) differ from the spec")
             if not result.interconnect_enabled:
                 reasons.append("link heat was disabled")
+            if result.skipped_workloads:
+                reasons.append(
+                    "only some workloads were run (skipped "
+                    + ", ".join(result.skipped_workloads)
+                    + ")"
+                )
             verdict = "Not leaderboard-comparable: " + "; ".join(reasons) + "."
             role = "warn"
         self.comparability.set_message(verdict, role)
@@ -393,7 +399,7 @@ class ResultsPanel(QWidget):
                         style.OK_COLOR if run.score < 1.0 else style.WARN_COLOR
                     )
                 if not run.comparable:
-                    score.setToolTip("Setup differs from the spec, so this score is not comparable.")
+                    score.setToolTip("Not leaderboard-comparable; see the run's verdict for why.")
                 self.history_table.setItem(row, 4, score)
                 self.history_table.setItem(row, 5, read_only_item(f"{run.seconds:.0f}", True))
             if 0 <= current < len(runs):

@@ -368,7 +368,7 @@ class MainWindow(QMainWindow):
 
     def _on_placement_typed(self, name: str, x_mm: float, y_mm: float) -> None:
         x_mm, y_mm = analysis.clamp_into_interposer(self.project, name, x_mm, y_mm)
-        self.project.placements_mm[name] = [round(x_mm, 4), round(y_mm, 4)]
+        self.project.placements_mm[name] = analysis.round_origin(x_mm, y_mm)
         self.canvas_panel.canvas.sync_from_project()
         self._mark_dirty()
         self.revalidate()
@@ -519,7 +519,7 @@ class MainWindow(QMainWindow):
             x_mm, y_mm = analysis.clamp_into_interposer(
                 self.project, name, analysis.snap(x_mm, step), analysis.snap(y_mm, step)
             )
-            self.project.placements_mm[name] = [round(x_mm, 4), round(y_mm, 4)]
+            self.project.placements_mm[name] = analysis.round_origin(x_mm, y_mm)
         self.canvas_panel.canvas.sync_from_project()
         self.log.log(f"Snapped every origin to {step:g} mm.")
         self._mark_dirty()
@@ -634,6 +634,11 @@ class MainWindow(QMainWindow):
             )
             if answer != QMessageBox.StandardButton.Yes:
                 return
+        if len(workloads) < len(self.project.workloads):
+            self.log.log(
+                "Not every workload is ticked, so this run's worst case and score are "
+                "partial and will not be leaderboard-comparable."
+            )
         self.log.log(
             f"Starting {len(workloads)} workload(s) at {self.project.run.grid}x{self.project.run.grid}: "
             + ", ".join(workloads)
@@ -794,8 +799,10 @@ class MainWindow(QMainWindow):
             "PNG image (*.png)",
         )
         if path:
-            self.canvas_panel.canvas.grab_png(path)
-            self.log.log(f"Saved the canvas to {path}.")
+            if self.canvas_panel.canvas.grab_png(path):
+                self.log.log(f"Saved the canvas to {path}.")
+            else:
+                self.log.log(f"Could not save the canvas to {path}.")
 
     def open_run_folder(self) -> None:
         if not (0 <= self._current_run < len(self._runs)):

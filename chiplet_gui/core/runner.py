@@ -97,10 +97,20 @@ class RunResult:
         return self.objectives.get("leaderboard_score")
 
     @property
-    def comparable(self) -> bool:
-        """True when nothing was changed that would invalidate the score."""
+    def skipped_workloads(self) -> list[str]:
+        """Workloads of the design that this run did not simulate."""
 
-        return not self.deviations and self.interconnect_enabled
+        return [name for name in self.project.workloads if name not in self.workloads]
+
+    @property
+    def comparable(self) -> bool:
+        """True when nothing was changed that would invalidate the score.
+
+        The judge takes the worst case over every workload, so a run that left
+        any out can only under-report and is never comparable.
+        """
+
+        return not self.deviations and self.interconnect_enabled and not self.skipped_workloads
 
     def temperature_map(self, workload: str) -> np.ndarray | None:
         entry = self.workloads.get(workload)

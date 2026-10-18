@@ -38,3 +38,9 @@ hotspot.exe
 *.swp
 .DS_Store
 Thumbs.db
+
+# Optimizer output while a run is in progress, and the demo's HotSpot cache.
+# Commit a finished results/optimize_<material>/submission.json deliberately.
+results_opt_*.log
+results/optimize_*/
+results/demo_cache/
